@@ -66,7 +66,7 @@ for example want to display the current window title, create the file
 `captain.d/title` (the name is entirely up to you) and add:
 
 ```
-xtitle `bspc query -W -w`
+xtitle `xdotool getactivewindow`
 ```
 
 That's all! We can now start displaying it by making a section for in the
