@@ -1,1 +1,1 @@
-xtitle `bspc query -W -w`
+xtitle `xdotool getactivewindow`
