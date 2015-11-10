@@ -20,49 +20,30 @@
 #
 #  A dynamic lemonbar script written almost entirely in bash.
 
-set -e
+cd $(dirname $0)
 
-# Create the location of the log file and create the file descriptor.
+set -e
 
 if [[ ! -d ~/.config/captain ]]; then
     mkdir -p ~/.config/captain
-fi
-exec 3<> ~/.config/captain/captain.log
+fi && exec 3<> ~/.config/captain/captain.log
 
-# Assign the location of our pipe files.
+source <(python3 -c "
+import sys, re, configparser
+c = configparser.ConfigParser()
+c.read(sys.argv[1])
+for section in c:
+    for key in c[section]:
+        current = re.sub('[\n ]', '$', c[section][key]).split('$')
+        key = key.replace('-', '_')
+        if len(current) == 1: print(\"{}_{}={}\".format(section, key, current[0]))
+        else: print(\"{}_{}=({})\".format(section, key, \" \".join(current)))
+" captainrc 2>&3) 2>&3
+
+trap "rm -f \"$unique\" \"$process\"; trap - TERM; kill 0" INT ERR TERM QUIT EXIT
 
 export process=/tmp/captain-process
 export unique=/tmp/captain-stack
-
-# Clean up the /tmp files used for the script when we're done.
-
-trap "rm -f $unique $process; trap - TERM; kill 0" INT ERR TERM QUIT EXIT
-
-# You might be thinking. What the fuck is wrong with this dude. Why the fuck
-# would he ever fucking do this. What the fuck. Well, why not right?
-# Thanks to https://github.com/csvoss for making this possible.
-
-source <(python3 -c "(lambda __print, __g, __y: [[(lambda __after: ([] for [] in [])
-.throw(ImportError('You are not using version 3.x.x')) if (sys.hexversion <
-50331648) else __after())(lambda: (lambda __after: ([] for [] in [])
-.throw(TypeError('You need to specify the file to extract from.')) if
-(len(sys.argv) <= 1) else __after())(lambda: (lambda __mod: [[(config.read(
-sys.argv[1]), (lambda __items, __after, __sentinel: __y(lambda __this:
-lambda: (lambda __i: [(lambda __items, __after, __sentinel: __y(lambda
-__this: lambda: (lambda __i: [[(lambda __after: (__print('{}_{}={}'.format(
-section, key, current[0])), __after())[1] if (len(current) == 1) else (
-__print('{}_{}=({})'.format(section, key, ' '.join(current))), __after())
-[1])(lambda: __this()) for __g['current'] in [(re.sub('[\n ]', '::', config
-[section][key]).split('::'))]][0] for __g['key'] in [(__i)]][0] if __i is
-not __sentinel else __after())(next(__items, __sentinel)))())(iter(config
-[section]), lambda: __this(), []) for __g['section'] in [(__i)]][0] if __i
-is not __sentinel else __after())(next(__items, __sentinel)))())(iter(config),
-lambda: None, []))[1] for __g['config'] in [(ConfigParser())]][0] for
-__g['ConfigParser'] in [(__mod.ConfigParser)]][0])(__import__('configparser',
-__g, __g, ('ConfigParser',), 0)))) for __g['sys'] in [(__import__('sys',
-__g, __g))]][0] for __g['re'] in [(__import__('re', __g, __g))]][0])(
-__import__('builtins').__dict__['print'], globals(), (lambda f: (lambda x: x(x))(
-lambda y: f(lambda: y(y)()))))" captainrc 2>&3) 2>&3
 
 # Does this need revision? Yes.
 stack() {
@@ -109,7 +90,7 @@ handle() {
     } 2>&3
 }
 
-# Does this need revision? Likely.
+# Does this need revision? No.
 format() {
     {
     # Dynamically format all the available options and display them accordingly.
@@ -117,8 +98,7 @@ format() {
     position=$(sed 's/:/ /g' <<< $position)
     for script in captain.d/*; do
         position=$(sed "s/$(basename $script)/\$__$(basename $script)/g" <<< $position)
-        switch="$switch
-        $(basename $script)) __$(basename $script)=\${line#*@} ;;"
+        switch="$switch $(basename $script)) __$(basename $script)=\${line#*@} ;;"
     done
     echo $switch
     while read -r line; do
@@ -130,20 +110,47 @@ format() {
     } 2>&3
 }
 
+# Does this need revision? Likely.
+{
+    # Bar related things.
+    declare -A bar
+    bar=([background]="#FFFFFFFF"
+         [background]="#FF000000"
+         [position]="||"
+         [offset]=0
+         [height]=20
+         [fonts]="monospace-9"
+         [dock]="top")
+    for section in "${!bar[@]}"; do
+        if [[ $(eval "echo \${#bar_${section}}") -eq 0 ]]; then
+            echo "Main: No value for 'bar-$section' -> using ${bar[${section}]}"
+            eval "bar_${section}=${bar[${section}]}"
+        fi
+    done
+    bar_fonts=$(printf " -f %s" "${bar_fonts[@]}")
+    [[ $bar_offset -gt 0 ]] && bar_offset="-o $bar_offset" || bar_offset=""
+    [[ $bar_dock == "bottom" ]] && bar_dock="-b" || bar_dock=""
+    if [[ ! -z `pgrep bspwm` ]]; then
+        bspc config top_padding $bar_height
+    fi
+} 2>&3
+
 # Does this need revision? No.
 {
     # Set the a default choice for every variable that is not defined.
-    declare -A choice
-    choice=([foreground]="#FFFFFFFF"
-            [background]="#FF000000"
-            [display]=false
-            [reload]=5)
+    declare -A choices
+    choices=([foreground]="#FFFFFFFF"
+             [background]="#FF000000"
+             [underline]=false
+             [overline]=false
+             [display]=false
+             [reload]=5)
     for file in captain.d/*; do
         name=$(basename $file)
-        for section in "${!choice[@]}"; do
+        for section in "${!choices[@]}"; do
             if [[ $(eval "echo \${#${name}_${section}}") -eq 0 ]]; then
-                echo "Main: No value for '${name}-$section' -> using ${choice[${section}]}"
-                eval "${name}_${section}=${choice[${section}]}"
+                echo "Main: No value for '${name}-$section' -> using ${choices[${section}]}"
+                eval "${name}_${section}=${choices[${section}]}"
             fi
         done
     done
@@ -151,55 +158,56 @@ format() {
 
 # Does this need revision? Likely.
 {
-    # Create 'event' handles that embedded when parsing the output string. It
-    # also saves the matching command to an array which we can later use to
-    # activate run the event.
+    # Create 'event' and 'over- underline' handles that are embedded when parsing
+    # the output string.
     declare -A handle area
     for file in captain.d/*; do
         name=$(basename $file)
-        if [[ $(eval "echo \${#${name}_events[@]}") -gt 0 ]]; then
-            for event in "$(eval "echo \${${name}_events[@]}")"; do
-                IFS=':' read -a event <<< "$event"
+        events=("mouse_middle" "scroll_down" "mouse_right" "mouse_left" "scroll_up")
+        area["${name}_p"]="%{"
+        area["${name}_s"]="%{"
+        for decoration in overline underline; do
+            if [[ $(eval "echo \${${name}_$decoration}") = true ]]; then
+                area["${name}_p"]="${area["${name}_p"]}+$decoration"
+                area["${name}_s"]="${area["${name}_s"]}-$decoration"
+            fi
+        done
+        area["${name}_p"]="${area["${name}_p"]}}"
+        area["${name}_s"]="${area["${name}_s"]}}"
+        for event in ${events[@]}; do
+            if [[ ! -z $(eval "echo \${${name}_${event}}") ]]; then
                 uid="$(stack retrieve ${name})${name}"
-                eval "area[${name}_p]='${area[${name}_p]}${event_p}%{A${event[0]}:${uid}:}'"
-                eval "area[${name}_s]='${area[${name}_s]}%{A}'"
-                eval "handle[${uid}]=\"${event[1]}\""
-            done
-        else
-            echo "Main: No events specified for '${name}' -> using none."
-        fi
+                handle[${uid}]="$(eval "echo \${${name}_${event}}")"
+                case "$event" in
+                    "mouse_middle") event=2 ;;
+                    "scroll_down") event=5 ;;
+                    "mouse_right") event=3 ;;
+                    "mouse_left") event=1 ;;
+                    "scroll_up") event=4 ;;
+                esac
+                area["${name}_p"]="${area["${name}_p"]}%{A${event}:${uid}:}"
+                area["${name}_s"]="${area["${name}_s"]}%{A}"
+            else
+                echo "Main: No events specified for '${name}-${event/_/-}' -> using none."
+            fi
+        done
     done
 } 2>&3
 
-# Does this need revision? Likely.
-{
-    # Correctly set the fonts so we can apply them with xargs.
-    bar_fonts=$(printf " -f %s" ${bar_fonts[@]})
-} 2>&3
-
-# Does this need revision? Likely.
-{
-    # Set offset for specific window managers.
-    if [[ ! -z `pgrep bspwm` ]]; then
-        bspc config top_padding $bar_height
-    fi
-} 2>&3
-
-# Does this need revision? Likely.
+# Does this need revision? No.
 {
     # Parse our previously collected elements to a full string.
     if [[ -e $process ]]; then
         rm $process
-    fi
-    mkfifo "$process"
+    fi && mkfifo "$process"
     for file in captain.d/*; do
         name=$(basename $file)
         if [[ $(eval "echo \${${name}_display}") = true ]]; then
-            uid=$(stack retrieve)
             while :; do
                 printf "%s" \
                     "${name}@" \
                     "$(eval "echo \${area[${name}_p]"})" \
+                    "%{$(eval "echo \${area[${name}_d]"})}" \
                     "%{F$(eval "echo \${${name}_foreground}")}" \
                     "%{B$(eval "echo \${${name}_background"})}" \
                     "$(tr '\n' ' ' < <(bash < "$file"))" \
@@ -215,5 +223,5 @@ format() {
     echo
 } 2>&3
 
-cat "$process" | format | lemonbar $bar_fonts -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
+cat "$process" | format | lemonbar $bar_dock $bar_offset $bar_fonts -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
 wait

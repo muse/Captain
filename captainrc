@@ -21,7 +21,8 @@ foreground = "#FFFFFFFF"
 position = "|title|clock"
 height = 20
 fonts = "monospace-9"
-        "serif-11"
+dock = "top"
+offset = 0
 
 ; Anything below here is defined by the user.
 
@@ -29,11 +30,14 @@ fonts = "monospace-9"
 background = "#FF000000"
 foreground = "#FFFFFFFF"
 display = true
-events = "1:notify-send 'Hi'"
+overline = true
+scroll-up = "notify-send 'Being scrolled!'"
+mouse-left = "urxvt"
 reload = 5
 
 [title]
 background = "#FF000000"
 foreground = "#FFFFFFFF"
+underline = true
 display = true
-reload = 1
+reload  = 0.1
