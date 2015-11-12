@@ -31,13 +31,16 @@ background = "#FF000000"
 foreground = "#FFFFFFFF"
 display = true
 overline = true
-scroll-up = "notify-send 'Being scrolled!'"
-mouse-left = "urxvt"
+underline = true
+scroll-up = "notify-send 'Scrolled up!'"
+scroll-down = "notify-send 'Scrolled down!'"
+mouse-middle = "notify-send 'Middle click!'"
+mouse-left = "notify-send 'Left click!'"
+mouse-right = "notify-send 'Right click!'"
 reload = 5
 
 [title]
 background = "#FF000000"
 foreground = "#FFFFFFFF"
-underline = true
 display = true
 reload  = 0.1
