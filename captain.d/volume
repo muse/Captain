@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# Dependencies: amixer, siji
+
+volume=$(amixer sget Master | sed -n "0,/.*\[\([0-9]\+\)%\].*/s//\1/p")
+state=$(amixer sget Master | grep -Eoe '\[(on|off)\]')
+
+if   [[ $volume -eq 0 || $state == '[off]' ]]; then
+    token=''
+elif [[ $volume -gt 50 ]]; then
+    token=''
+else
+    token=''
+fi
+
+echo "$token $volume%"

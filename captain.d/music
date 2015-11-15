@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Dependencies: mpd, mpc, siji
+
+state=$(mpc status | grep -oe '\[[a-z]*\]')
+song=$(mpc current)
+
+if [[ $(wc -c <<< "$song") -gt 48 ]]; then
+    song="$(cut -b 1-48 <<< "$song") ~"
+fi
+if   [[ -z $state ]]; then
+    token=""
+elif [[ $state == "[paused]" ]]; then
+    token=""
+else
+    token="";
+fi
+
+echo "$token $song"

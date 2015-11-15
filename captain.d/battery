@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# Dependencies: acpi, siji
+
+percentage=$(acpi --battery | awk '{gsub(/,/, "");} {print $4}' | sed 's/.$//')
+
+case $percentage in
+    [0-9])      token='' ;;
+    [1-2][0-9]) token='' ;;
+    [3-4][0-9]) token='' ;;
+    [5-6][0-9]) token='' ;;
+    [7-8][0-9]) token='' ;;
+    9[0-9]|100) token='' ;;
+esac
+if [[ $(acpi -a | grep on) ]]; then
+    token=''
+fi
+
+echo "$token $percentage%"

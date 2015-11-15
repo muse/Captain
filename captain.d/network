@@ -1,0 +1,24 @@
+#!/usr/bin/env bash
+# Dependencies: iwconfig, siji
+
+wifi=$(cat /sys/class/net/wlp*/operstate)
+ethn=$(cat /sys/class/net/enp*/operstate)
+min=$(iwconfig 2>&1 | grep 'Link' | awk '{gsub(/[=/]/," "); print $3}')
+max=$(iwconfig 2>&1 | grep 'Link' | awk '{gsub(/[=/]/," "); print $4}')
+
+if [[ "$wifi" == "up" ]]; then
+    percentage=$(bc <<< "$min * 100 / $max")
+    case $percentage in
+        [1-9] ) token="" ;;
+        [1-3]*) token="" ;;
+        [4-5]*) token="" ;;
+        [6-7]*) token="" ;;
+        *)      token="" ;;
+    esac
+elif [[ "$ethn" == "up" ]]; then
+    token=""
+else
+    token=""
+fi
+
+echo "$token"
