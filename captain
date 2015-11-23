@@ -25,14 +25,19 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
+# Obviously we set -e to quit at any error.
 set -e
 
+# Change the current directory to the captain directory always. This would cause
+# problems when the script is not ran from the captain directory.
+cd $(dirname $0)
+
+# Create the log file, and bind it to a file descriptor.
 if [[ ! -d ~/.config/captain ]]; then
     mkdir -p ~/.config/captain
 fi && exec 3<> ~/.config/captain/captain.log
 
-cd $(dirname $0)
-
+# The only bit of python in the code, we parse .dosini file with it.
 source <(python3 -c "
 import sys, re, configparser
 c = configparser.ConfigParser()
@@ -41,51 +46,33 @@ for section in c:
     for key in c[section]:
         current = re.sub('[\n ]', '$', c[section][key]).split('$')
         key = key.replace('-', '_')
-        if len(current) == 1: print(\"{}_{}={}\".format(section, key, current[0]))
-        else: print(\"{}_{}=({})\".format(section, key, \" \".join(current)))
+        if len(current) == 1:
+            print(\"{}_{}={}\".format(section, key, current[0]))
+        else:
+            print(\"{}_{}=({})\".format(section, key, \" \".join(current)))
 " captainrc 2>&3) 2>&3
-
-trap "rm -f \"$unique\" \"$process\"; trap - TERM; kill 0" INT ERR TERM QUIT EXIT
 
 export process=/tmp/captain-process
 export unique=/tmp/captain-stack
 
-# Does this need revision? Yes.
-stack() {
-    # Manage various stacks of unique characters which are to be attached later.
-    {
-        if [[ ${#@} -ge 1 ]]; then
-            case $1 in
-                construct)
-                    for section in captain.d/*; do
-                        printf "%s" "$(basename $section):" {A..E} $'\n' >> $unique
-                    done
-                    ;;
-                retrieve)
-                    IFS=":"
-                    stack_t=($(grep -e "$2:" < <(cat $unique)))
-                    sed -i "/$2:/d" $unique
-                    echo ${stack_t[1]:0:1}
-                    echo "${stack_t[0]}:${stack_t[1]:1:$((${#stack_t[1]} + 1))}" >> $unique
-                    ;;
-                *)
-                    echo "Stack: Invalid argument."
-                    exit 0
-                    ;;
-            esac
-        else
-            echo "Stack: You did not specify enough arguments."
-            exit 0
-        fi
-    } 2>&3
-} && export -f stack
+# Always clean up when you are done.
+trap "rm -f $unique $process; trap - TERM; kill 0" INT ERR TERM QUIT
 
-stack construct
+# Does this need revision? No.
+stack() {
+    {
+    # Retrieve a value from the stack.
+    IFS=":" read -a char < <(grep -e "$1" < <(cat $unique))
+    sed -i "/$1:/d" $unique
+    echo "${char[0]}:${char[1]:1:$((${#char[1]} + 1))}" >> $unique
+    echo ${char[1]:0:1}
+    } 2>&3
+}
 
 # Does this need revision? No.
 handle() {
     {
-    # Catch string from stdout and execute the matching commands.
+    # Catch strings from stdout and execute the matching commands.
     while read -r line; do
         local cmd=${handle[$line]}
         if [[ ! -z $cmd ]]; then
@@ -99,13 +86,11 @@ handle() {
 format() {
     {
     # Dynamically format all the available options and display them accordingly.
-    position=$(sed 's/|/%{r}/' <(sed 's/|/%{c}/' <<< $bar_position))
-    position=$(sed 's/:/ /g' <<< $position)
+    position=$(sed 's/:/ /g;s/|/%{c}/;s/|/%{r}/' <<< $bar_position)
     for script in captain.d/*; do
         position=$(sed "s/$(basename $script)/\$__$(basename $script)/g" <<< $position)
         switch="$switch $(basename $script)) __$(basename $script)=\${line#*@} ;;"
     done
-    echo $switch
     while read -r line; do
         eval "case ${line%%@*} in
             $switch
@@ -115,10 +100,16 @@ format() {
     } 2>&3
 }
 
-# Does this need revision? Likely.
+manual() {
+    # Manual mode hype ;)
+    :
+}
+
+# Does this need revision? No.
 {
     # Bar related things.
     declare -A bar
+    window=(bspwm)
     bar=([background]="#FFFFFFFF"
          [background]="#FF000000"
          [position]="||"
@@ -131,24 +122,33 @@ format() {
             echo "Main: No value for 'bar-$section' -> using ${bar[${section}]}"
             eval "bar_${section}=${bar[${section}]}"
         fi
+        case $section in
+            offset) eval "bar_${section}=\"-o $bar_offset\"" ;;
+            fonts) eval "bar_${section}=\"$(printf " -f %s" "${bar_fonts[@]}")\"" ;;
+            dock) eval "bar_${section}=\"-${bar_dock//[^b]/}\"" ;;
+        esac
     done
-    bar_fonts=$(printf " -f %s" "${bar_fonts[@]}")
-    [[ $bar_offset -gt 0 ]] && bar_offset="-o $bar_offset" || bar_offset=""
-    [[ $bar_dock == "bottom" ]] && bar_dock="-b" || bar_dock=""
-    if [[ ! -z `pgrep bspwm` ]]; then
-        bspc config top_padding $bar_height
-    fi
-} 2>&3
+    for section in captain.d/*; do
+        printf "%s" "$(basename $section):" {A..E} $'\n' >> $unique
+    done
+    for manager in ${window[@]}; do
+        if [[ ! -z `pgrep $manager` ]]; then
+            case $manager in
+                bspwm) bspc config top_padding $bar_height ;;
+            esac && break
+        fi
+    done
+} 2>&2
 
 # Does this need revision? No.
 {
-    # Set the a default choice for every variable that is not defined.
+    # Whenever a value is not defined, set the default value for it.
     declare -A choices
     choices=([foreground]="#FFFFFFFF"
              [background]="#FF000000"
-             [underline]=false
              [overline]=false
              [display]=false
+             [manual]=false
              [reload]=5)
     for file in captain.d/*; do
         name=$(basename $file)
@@ -163,35 +163,43 @@ format() {
 
 # Does this need revision? Likely.
 {
-    # Create 'event' and 'over- underline' handles that are embedded when parsing
-    # the output string.
-    declare -A handle area
+    # Define what lines to draw, and what color they should be.
+    declare -A line
     for file in captain.d/*; do
         name=$(basename $file)
-        events=("mouse_middle" "scroll_down" "mouse_right" "mouse_left" "scroll_up")
-        area["${name}_p"]="%{"
-        area["${name}_s"]="%{"
-        for decoration in overline underline; do
-            if [[ $(eval "echo \${${name}_$decoration}") = true ]]; then
-                area["${name}_p"]="${area["${name}_p"]}+${decoration:0:1}"
-                area["${name}_s"]="${area["${name}_s"]}-${decoration:0:1}"
+        if [[ $(eval "echo \${#${name}_line}") -eq 0 ]]; then
+            echo "Main: No value for '${name}-line' -> using ${choices[foreground]}"
+            eval "${name}_line=${choices[foreground]}"
+        fi
+        line["${name}"]="%{"
+        for section in underline overline; do
+            if [[ $(eval "echo \${${name}_${section}}") = true ]]; then
+                line["${name}"]+="+${section:0:1}"
+            else
+                echo "Main: No value for '${name}-${section}' -> using false"
             fi
         done
-        area["${name}_p"]="${area["${name}_p"]}}"
-        area["${name}_s"]="${area["${name}_s"]}}"
-        for event in ${events[@]}; do
+        line["${name}"]+="U$(eval "echo \${${name}_line}")}"
+    done
+} 2>&2
+
+# Does this need revision? Yes.
+{
+    # Create event handles and embed them in areas.
+    declare -A handle area events
+    events=([mouse_middle]=2
+            [scroll_down]=5
+            [mouse_right]=3
+            [mouse_left]=1
+            [scroll_up]=4)
+    for file in captain.d/*; do
+        name=$(basename $file)
+        for event in ${!events[@]}; do
             if [[ ! -z $(eval "echo \${${name}_${event}}") ]]; then
-                uid="$(stack retrieve ${name})${name}"
-                handle[${uid}]="$(eval "echo \${${name}_${event}}")"
-                case "$event" in
-                    "mouse_middle") event=2 ;;
-                    "scroll_down") event=5 ;;
-                    "mouse_right") event=3 ;;
-                    "mouse_left") event=1 ;;
-                    "scroll_up") event=4 ;;
-                esac
-                area["${name}_p"]="${area["${name}_p"]}%{A${event}:${uid}:}"
-                area["${name}_s"]="${area["${name}_s"]}%{A}"
+                uid="$(stack ${name})${name}"
+                handle["${uid}"]="$(eval "echo \${${name}_${event}}")"
+                area["${name}_p"]+="%{A${events[$event]}:${uid}:}"
+                area["${name}_s"]+="%{A}"
             else
                 echo "Main: No events specified for '${name}-${event/_/-}' -> using none."
             fi
@@ -212,12 +220,13 @@ format() {
                 printf "%s" \
                     "${name}@" \
                     "$(eval "echo \${area[${name}_p]"})" \
-                    "%{$(eval "echo \${area[${name}_d]"})}" \
+                    "$(eval "echo \${line[${name}]"})" \
                     "%{F$(eval "echo \${${name}_foreground}")}" \
                     "%{B$(eval "echo \${${name}_background"})}" \
                     "$(tr '\n' ' ' < <(bash < "$file"))" \
                     "%{F-}%{B-}" \
                     "$(eval "echo \${area[${name}_s]"})" \
+                    "%{-o}%{-uU-}" \
                     $'\n'
                 sleep $(eval "echo \${${name}_reload"})
             done > "$process" &
@@ -225,8 +234,7 @@ format() {
             echo "Main: ${name} is set not to display."
         fi
     done
-    echo
-} 2>&3
+} 2>&2
 
 cat "$process" | format | lemonbar $bar_dock $bar_offset $bar_fonts -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
 wait
