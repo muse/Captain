@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+# Dependencies: bspc, siji
+
+bspc control --get-status | while read -r line; do
+    case $line in
+        W*) window=""
+            IFS=':'
+            set -- ${line#?}
+            while [[ $# -gt 0 ]]; do
+                case $1 in
+                    O*) window="${window}%{F<<focused_fg>>}  %{F-}"
+                       ;;
+                    F*) window="${window}%{F<<focused_fg>>}  %{F-}"
+                        ;;
+                    U*) window="${window}%{F<<focused_fg>>}  %{F-}"
+                        ;;
+                    o*) window="${window}%{F<<passive_fg>>}  %{F-}"
+                        ;;
+                    f*) window="${window}%{F<<passive_fg>>}  %{F-}"
+                        ;;
+                    u*) window="${window}%{F<<passive_fg>>}  %{F-}"
+                        ;;
+                esac
+                shift
+            done
+            ;;
+    esac
+    echo "$window"
+done

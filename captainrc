@@ -16,16 +16,28 @@
 ; captain.d directory.
 
 [bar]
-background = "#FF000000"
-foreground = "#FFFFFFFF"
-position = "|title|clock"
+background = "#FFFFFFFF"
+foreground = "#FF000000"
+position = "windows|title|clock"
 height = 20
 fonts = "monospace-9"
+        "-wuncon-siji-medium-r-normal--10-100-75-75-c-80-iso10646-1"
 dock = "top"
 offset = 0
 
 ; Anything below here is defined by the user.
 
+; Example of a manual script.
+[windows]
+manual = true
+display = true
+reload = 1
+passive-bg='#FF170F0D'
+passive-fg='#FFAF652F'
+focused-bg='#FF170F0D'
+focused-fg='#FFC8B55B'
+
+; Example of normal scripts.
 [clock]
 background = "#FF000000"
 foreground = "#FFFFFFFF"
@@ -51,3 +63,5 @@ mouse-left = "notify-send 'Left click!'"
 mouse-right = "notify-send 'Right click!'"
 display = true
 reload  = 0.1
+
+# vim:syntax=dosini

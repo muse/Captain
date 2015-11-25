@@ -58,10 +58,10 @@ export unique=/tmp/captain-stack
 # Always clean up when you are done.
 trap "rm -f $unique $process; trap - TERM; kill 0" INT ERR TERM QUIT
 
-# Does this need revision? No.
+# Retrieve a value from the stack, the stack is a collection of all scripts with
+# unique sets of characters that are used for event handles.
 stack() {
     {
-    # Retrieve a value from the stack.
     IFS=":" read -a char < <(grep -e "$1" < <(cat $unique))
     sed -i "/$1:/d" $unique
     echo "${char[0]}:${char[1]:1:$((${#char[1]} + 1))}" >> $unique
@@ -69,10 +69,9 @@ stack() {
     } 2>&3
 }
 
-# Does this need revision? No.
+# Catch the strings send to stdout and execute the matching command.
 handle() {
     {
-    # Catch strings from stdout and execute the matching commands.
     while read -r line; do
         local cmd=${handle[$line]}
         if [[ ! -z $cmd ]]; then
@@ -82,10 +81,9 @@ handle() {
     } 2>&3
 }
 
-# Does this need revision? No.
+# Dynamically format all the available options and display them accordingly.
 format() {
     {
-    # Dynamically format all the available options and display them accordingly.
     position=$(sed 's/:/ /g;s/|/%{c}/;s/|/%{r}/' <<< $bar_position)
     for script in captain.d/*; do
         position=$(sed "s/$(basename $script)/\$__$(basename $script)/g" <<< $position)
@@ -100,23 +98,18 @@ format() {
     } 2>&3
 }
 
-manual() {
-    # Manual mode hype ;)
-    :
-}
-
-# Does this need revision? No.
+# The defaults for the [bar] section. Most of the values are simplified and
+# require some extra attention to be formatted correctly.
 {
-    # Bar related things.
-    declare -A bar
-    window=(bspwm)
-    bar=([background]="#FFFFFFFF"
-         [background]="#FF000000"
-         [position]="||"
-         [offset]=0
-         [height]=20
-         [fonts]="monospace-9"
-         [dock]="top")
+    declare -A bar=(
+        [foreground]="#FFFFFFFF"
+        [background]="#FF000000"
+        [position]="||"
+        [offset]=0
+        [height]=20
+        [fonts]="monospace-9"
+        [dock]="top"
+    )
     for section in "${!bar[@]}"; do
         if [[ $(eval "echo \${#bar_${section}}") -eq 0 ]]; then
             echo "Main: No value for 'bar-$section' -> using ${bar[${section}]}"
@@ -131,27 +124,28 @@ manual() {
     for section in captain.d/*; do
         printf "%s" "$(basename $section):" {A..E} $'\n' >> $unique
     done
-    for manager in ${window[@]}; do
-        if [[ ! -z `pgrep $manager` ]]; then
-            case $manager in
-                bspwm) bspc config top_padding $bar_height ;;
-            esac && break
-        fi
-    done
-} 2>&2
+} 2>&3
 
-# Does this need revision? No.
+# Whenever a value is not defined, set the default value for it. Also looks for
+# manual mode.
 {
-    # Whenever a value is not defined, set the default value for it.
-    declare -A choices
-    choices=([foreground]="#FFFFFFFF"
-             [background]="#FF000000"
-             [overline]=false
-             [display]=false
-             [manual]=false
-             [reload]=5)
+    declare -A choices=(
+        [foreground]="#FFFFFFFF"
+        [background]="#FF000000"
+        [overline]=false
+        [display]=false
+        [manual]=false
+        [reload]=5)
     for file in captain.d/*; do
         name=$(basename $file)
+        if [[ $(eval "echo \${${name}_manual") = true ]]; then
+            echo "Main: Manual mode has been enabled for ${name}."
+            if [[ $(eval "echo \${#${name}_reload") -eq 0 ]]; then
+                echo "Main: No value for '${name}-$section' -> using ${choices[${section}]}"
+                eval "${name}_reload=${choices[reload]}"
+            fi
+            break
+        fi
         for section in "${!choices[@]}"; do
             if [[ $(eval "echo \${#${name}_${section}}") -eq 0 ]]; then
                 echo "Main: No value for '${name}-$section' -> using ${choices[${section}]}"
@@ -161,9 +155,8 @@ manual() {
     done
 } 2>&3
 
-# Does this need revision? Likely.
+# Define what lines to draw (under & over), and what color they should be..
 {
-    # Define what lines to draw, and what color they should be.
     declare -A line
     for file in captain.d/*; do
         name=$(basename $file)
@@ -183,9 +176,8 @@ manual() {
     done
 } 2>&2
 
-# Does this need revision? Yes.
+# Create event handles and add them in the area.
 {
-    # Create event handles and embed them in areas.
     declare -A handle area events
     events=([mouse_middle]=2
             [scroll_down]=5
@@ -207,34 +199,49 @@ manual() {
     done
 } 2>&3
 
-# Does this need revision? No.
+# Parse our previously collected elements to a full string.
 {
-    # Parse our previously collected elements to a full string.
     if [[ -e $process ]]; then
         rm $process
     fi && mkfifo "$process"
     for file in captain.d/*; do
         name=$(basename $file)
-        if [[ $(eval "echo \${${name}_display}") = true ]]; then
+        # Manual mode does not parse any of the variables defined by default.
+        if [[ $(eval "echo \${${name}_display}") = true &&
+              $(eval "echo \${${name}_manual}") = true ]]; then
             while :; do
                 printf "%s" \
                     "${name}@" \
-                    "$(eval "echo \${area[${name}_p]"})" \
-                    "$(eval "echo \${line[${name}]"})" \
-                    "%{F$(eval "echo \${${name}_foreground}")}" \
-                    "%{B$(eval "echo \${${name}_background"})}" \
-                    "$(tr '\n' ' ' < <(bash < "$file"))" \
-                    "%{F-}%{B-}" \
-                    "$(eval "echo \${area[${name}_s]"})" \
-                    "%{-o}%{-uU-}" \
+                    "$(tr '\n' ' ' < <(eval "$(sed "/^/,/$/ {
+                        s/<<\([a-zA-Z0-9\_\-\ ]*\)>>/\${${name}_\1}/g
+                    }" $file)"))" \
                     $'\n'
                 sleep $(eval "echo \${${name}_reload"})
             done > "$process" &
         else
-            echo "Main: ${name} is set not to display."
+            if [[ $(eval "echo \${${name}_display}") = true ]]; then
+                # Normal mode parsing, parses the variables for you.
+                while :; do
+                    printf "%s" \
+                        "${name}@" \
+                        "$(eval "echo \${area[${name}_p]"})" \
+                        "$(eval "echo \${line[${name}]"})" \
+                        "%{F$(eval "echo \${${name}_foreground}")}" \
+                        "%{B$(eval "echo \${${name}_background"})}" \
+                        "$(tr '\n' ' ' < <(bash < "$file"))" \
+                        "%{F-}%{B-}" \
+                        "$(eval "echo \${area[${name}_s]"})" \
+                        "%{-o}%{-uU-}" \
+                        $'\n'
+                    sleep $(eval "echo \${${name}_reload"})
+                done > "$process" &
+            else
+                echo "Main: ${name} is set not to display."
+            fi
         fi
     done
 } 2>&2
 
-cat "$process" | format | lemonbar $bar_dock $bar_offset $bar_fonts -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
+# Start captain.
+cat "$process"  | format | lemonbar $bar_dock $bar_offset $bar_fonts -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
 wait
