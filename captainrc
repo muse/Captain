@@ -18,30 +18,37 @@
 [bar]
 background = "#FFFFFFFF"
 foreground = "#FF000000"
-position = "windows|title|clock"
+format = "window|title|clock"
 height = 20
 fonts = "monospace-9"
         "-wuncon-siji-medium-r-normal--10-100-75-75-c-80-iso10646-1"
 dock = "top"
 offset = 0
 
-; Anything below here is defined by the user.
+; Anything below here is optional.
 
-; Example of a manual script.
-[windows]
+; Any manual script requires you to define 'manual = true'. All of the variables
+; except reload are omited in the process. Other variables are to be placed manually
+; by wrapping them in '<#' & '#>'.
+
+[window]
 manual = true
-display = true
-reload = 1
-passive-bg='#FF170F0D'
-passive-fg='#FFAF652F'
-focused-bg='#FF170F0D'
-focused-fg='#FFC8B55B'
+reload = 0.1
+
+; You can use dashes, these will be converted to underscores later. This also
+; means you need to reference to them with underscores in the script.
+
+passive = '#FFAF652F'
+focused = '#FFC8B55B'
+
+; Events look the same, but are defined differently. You wrap them in '<@ & @>'
+; A valid event would be '%{A1:<@event-name@>:}Hi!%{A}'.
 
 ; Example of normal scripts.
+
 [clock]
 background = "#FF000000"
 foreground = "#FFFFFFFF"
-display = true
 overline = true
 scroll-up = "notify-send 'Scrolled up!'"
 scroll-down = "notify-send 'Scrolled down!'"
@@ -61,7 +68,6 @@ scroll-down = "notify-send 'Scrolled down!'"
 mouse-middle = "notify-send 'Middle click!'"
 mouse-left = "notify-send 'Left click!'"
 mouse-right = "notify-send 'Right click!'"
-display = true
 reload  = 0.1
 
 # vim:syntax=dosini

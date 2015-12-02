@@ -1,11 +1,9 @@
 #!/bin/env bash
 #  Author: Mirko van der Waal
 #  Mail: <mvdw at airmail dot cc>
-#  Distributed under terms of the GNU2 license.
+#  Distributed under terms of the MIT license.
 #
 #  The MIT License (MIT)
-#
-#  Copyright (c) 2015 A[muse]ment
 #
 #  Permission is hereby granted, free of charge, to any person obtaining a copy
 #  of this software and associated documentation files (the "Software"), to deal
@@ -25,11 +23,11 @@
 #  OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 #  SOFTWARE.
 
-# Obviously we set -e to quit at any error.
+# Obviously we set -e to quit at anddiy error.
 set -e
 
-# Change the current directory to the captain directory always. This would cause
-# problems when the script is not ran from the captain directory.
+# Change the current directory to the captain directory always.
+# This would cause problems when the script is not ran from the captain directory.
 cd $(dirname $0)
 
 # Create the log file, and bind it to a file descriptor.
@@ -37,20 +35,41 @@ if [[ ! -d ~/.config/captain ]]; then
     mkdir -p ~/.config/captain
 fi && exec 3<> ~/.config/captain/captain.log
 
+# Create the scripts directory.
+if [[ ! -d ~.config/captain/captain.d ]]; then
+    mkdir -p ~/.config/captain/captain.d
+fi && treasure=~/.config/captain/captain.d
+
+manuscript=~/.config/captain/captainrc
+
 # The only bit of python in the code, we parse .dosini file with it.
 source <(python3 -c "
-import sys, re, configparser
-c = configparser.ConfigParser()
-c.read(sys.argv[1])
-for section in c:
-    for key in c[section]:
-        current = re.sub('[\n ]', '$', c[section][key]).split('$')
+import sys, re
+from configparser import ConfigParser
+
+def variable(*fmt):
+    return '{}_{}={}'.format(*fmt)
+
+def array(*fmt):
+    return '{}_{}=({})'.format(*fmt)
+
+parser = ConfigParser()
+parser.read(sys.argv[1])
+
+for section in parser:
+    for key in parser[section]:
+        # Split on spaces and newlines to determine when to create arrays.
+        current = re.sub('[\n ]', '$', parser[section][key]).split('$')
+        # Replace dashes with underscores for a better user experience.
         key = key.replace('-', '_')
         if len(current) == 1:
-            print(\"{}_{}={}\".format(section, key, current[0]))
+            print(variable(section, key, current[0]))
         else:
-            print(\"{}_{}=({})\".format(section, key, \" \".join(current)))
-" captainrc 2>&3) 2>&3
+            print(array(section, key, ' '.join(current)))
+" $manuscript 2>&3) 2>&3
+
+# "It is easier to port a shell than a shell script."
+#   -- Larry Wall
 
 export process=/tmp/captain-process
 export unique=/tmp/captain-stack
@@ -84,8 +103,8 @@ handle() {
 # Dynamically format all the available options and display them accordingly.
 format() {
     {
-    position=$(sed 's/:/ /g;s/|/%{c}/;s/|/%{r}/' <<< $bar_position)
-    for script in captain.d/*; do
+    position=$(sed 's/:/ /g;s/|/%{c}/;s/|/%{r}/' <<< $bar_format)
+    for script in $treasure/*; do
         position=$(sed "s/$(basename $script)/\$__$(basename $script)/g" <<< $position)
         switch="$switch $(basename $script)) __$(basename $script)=\${line#*@} ;;"
     done
@@ -98,30 +117,36 @@ format() {
     } 2>&3
 }
 
+# A tiny parser that allows the manual usage of variables and events.
+manual() {
+    {
+        format=$(sed "s/<\#\([a-zA-Z0-9\_\-\ ]*\)\#>/\${$1_\1}/g" $2)
+        for area in $(grep -Poe '(?<=<@).*?(?=@>)' <<< "$format"); do
+            handle["$1${area}"]="$(eval "echo \${${name}_${area}}")"
+            format=$(sed "s/<@\($area\)@>/$1${area}/g" <<< "$format")
+        done
+        content=$(tr '\n' ' ' < <(eval "$format"))
+    } 2>&3
+}
+
 # The defaults for the [bar] section. Most of the values are simplified and
 # require some extra attention to be formatted correctly.
 {
     declare -A bar=(
         [foreground]="#FFFFFFFF"
         [background]="#FF000000"
-        [position]="||"
+        [format]="||"
         [offset]=0
         [height]=20
         [fonts]="monospace-9"
-        [dock]="top"
-    )
+        [dock]="top")
     for section in "${!bar[@]}"; do
         if [[ $(eval "echo \${#bar_${section}}") -eq 0 ]]; then
-            echo "Main: No value for 'bar-$section' -> using ${bar[${section}]}"
+            echo "No value for 'bar-$section' -> using ${bar[${section}]}"
             eval "bar_${section}=${bar[${section}]}"
         fi
-        case $section in
-            offset) eval "bar_${section}=\"-o $bar_offset\"" ;;
-            fonts) eval "bar_${section}=\"$(printf " -f %s" "${bar_fonts[@]}")\"" ;;
-            dock) eval "bar_${section}=\"-${bar_dock//[^b]/}\"" ;;
-        esac
     done
-    for section in captain.d/*; do
+    for section in $treasure/*; do
         printf "%s" "$(basename $section):" {A..E} $'\n' >> $unique
     done
 } 2>&3
@@ -133,22 +158,21 @@ format() {
         [foreground]="#FFFFFFFF"
         [background]="#FF000000"
         [overline]=false
-        [display]=false
         [manual]=false
         [reload]=5)
-    for file in captain.d/*; do
+    for file in $treasure/*; do
         name=$(basename $file)
         if [[ $(eval "echo \${${name}_manual") = true ]]; then
-            echo "Main: Manual mode has been enabled for ${name}."
+            echo "Manual mode has been enabled for ${name}."
             if [[ $(eval "echo \${#${name}_reload") -eq 0 ]]; then
-                echo "Main: No value for '${name}-$section' -> using ${choices[${section}]}"
+                echo "No value for '${name}-$section' -> using ${choices[${section}]}"
                 eval "${name}_reload=${choices[reload]}"
             fi
             break
         fi
         for section in "${!choices[@]}"; do
             if [[ $(eval "echo \${#${name}_${section}}") -eq 0 ]]; then
-                echo "Main: No value for '${name}-$section' -> using ${choices[${section}]}"
+                echo "No value for '${name}-$section' -> using ${choices[${section}]}"
                 eval "${name}_${section}=${choices[${section}]}"
             fi
         done
@@ -158,10 +182,10 @@ format() {
 # Define what lines to draw (under & over), and what color they should be..
 {
     declare -A line
-    for file in captain.d/*; do
+    for file in $treasure/*; do
         name=$(basename $file)
         if [[ $(eval "echo \${#${name}_line}") -eq 0 ]]; then
-            echo "Main: No value for '${name}-line' -> using ${choices[foreground]}"
+            echo "No value for '${name}-line' -> using ${choices[foreground]}"
             eval "${name}_line=${choices[foreground]}"
         fi
         line["${name}"]="%{"
@@ -169,7 +193,7 @@ format() {
             if [[ $(eval "echo \${${name}_${section}}") = true ]]; then
                 line["${name}"]+="+${section:0:1}"
             else
-                echo "Main: No value for '${name}-${section}' -> using false"
+                echo "No value for '${name}-${section}' -> using false"
             fi
         done
         line["${name}"]+="U$(eval "echo \${${name}_line}")}"
@@ -178,13 +202,13 @@ format() {
 
 # Create event handles and add them in the area.
 {
-    declare -A handle area events
-    events=([mouse_middle]=2
-            [scroll_down]=5
-            [mouse_right]=3
-            [mouse_left]=1
-            [scroll_up]=4)
-    for file in captain.d/*; do
+    declare -A area handle events=(
+        [mouse_middle]=2
+        [scroll_down]=5
+        [mouse_right]=3
+        [mouse_left]=1
+        [scroll_up]=4)
+    for file in $treasure/*; do
         name=$(basename $file)
         for event in ${!events[@]}; do
             if [[ ! -z $(eval "echo \${${name}_${event}}") ]]; then
@@ -193,7 +217,7 @@ format() {
                 area["${name}_p"]+="%{A${events[$event]}:${uid}:}"
                 area["${name}_s"]+="%{A}"
             else
-                echo "Main: No events specified for '${name}-${event/_/-}' -> using none."
+                echo "No events specified for '${name}-${event/_/-}' -> using none."
             fi
         done
     done
@@ -201,47 +225,58 @@ format() {
 
 # Parse our previously collected elements to a full string.
 {
+    export content
     if [[ -e $process ]]; then
         rm $process
     fi && mkfifo "$process"
-    for file in captain.d/*; do
+    for file in $treasure/*; do
         name=$(basename $file)
-        # Manual mode does not parse any of the variables defined by default.
-        if [[ $(eval "echo \${${name}_display}") = true &&
-              $(eval "echo \${${name}_manual}") = true ]]; then
+        if [[ $(eval "echo \${${name}_manual}") = true ]]; then
             while :; do
+                manual "$name" "$file"
                 printf "%s" \
                     "${name}@" \
-                    "$(tr '\n' ' ' < <(eval "$(sed "/^/,/$/ {
-                        s/<<\([a-zA-Z0-9\_\-\ ]*\)>>/\${${name}_\1}/g
-                    }" $file)"))" \
+                    "${content}" \
                     $'\n'
                 sleep $(eval "echo \${${name}_reload"})
             done > "$process" &
         else
-            if [[ $(eval "echo \${${name}_display}") = true ]]; then
-                # Normal mode parsing, parses the variables for you.
-                while :; do
-                    printf "%s" \
-                        "${name}@" \
-                        "$(eval "echo \${area[${name}_p]"})" \
-                        "$(eval "echo \${line[${name}]"})" \
-                        "%{F$(eval "echo \${${name}_foreground}")}" \
-                        "%{B$(eval "echo \${${name}_background"})}" \
-                        "$(tr '\n' ' ' < <(bash < "$file"))" \
-                        "%{F-}%{B-}" \
-                        "$(eval "echo \${area[${name}_s]"})" \
-                        "%{-o}%{-uU-}" \
-                        $'\n'
-                    sleep $(eval "echo \${${name}_reload"})
-                done > "$process" &
-            else
-                echo "Main: ${name} is set not to display."
-            fi
+            while :; do
+                printf "%s" \
+                    "${name}@" \
+                    "$(eval "echo \${area[${name}_p]"})" \
+                    "$(eval "echo \${line[${name}]"})" \
+                    "%{F$(eval "echo \${${name}_foreground}")}" \
+                    "%{B$(eval "echo \${${name}_background"})}" \
+                    "$(tr '\n' ' ' < <(bash < "$file"))" \
+                    "%{F-}%{B-}" \
+                    "$(eval "echo \${area[${name}_s]"})" \
+                    "%{-o}%{-uU-}" \
+                    $'\n'
+                sleep $(eval "echo \${${name}_reload"})
+            done > "$process" &
         fi
     done
-} 2>&2
+} 2>&3
+
+# Information block.
+echo "
+===== ===== ===== ===== ===== =====
+$(date) - $(echo $USER)
+
+We found $(wc -l < <(ls $treasure)) scripts, we loaded roughly $(
+wc -w < <(uniq < <(sed 's/[|:]/\n/g' <<< $bar_format))) of them.
+
+You can limit the output visible by filtering it with 'grep'.
+If you want the corrections to be saved, pipe them to the log.
+
+If you're still confused, remember that the wiki exists: https://github.com/muse/Captain/wiki
+===== ===== ===== ===== ===== ====="
 
 # Start captain.
-cat "$process"  | format | lemonbar $bar_dock $bar_offset $bar_fonts -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
+cat "$process"| format | lemonbar \
+    $(echo "-o $bar_offset") \
+    $(printf " -f %s" "${bar_fonts[@]}") \
+    $(echo "-${bar_dock//[^b]/}") \
+    -g x$bar_height -F "$bar_foreground" -B "$bar_background" | handle | sh
 wait

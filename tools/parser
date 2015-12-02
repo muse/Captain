@@ -1,0 +1,31 @@
+#! /usr/bin/env python3
+#
+# After rewriting the parser, I decided to keep it here as a reference.
+# You can test run your config by passing it as an argument to the script.
+#
+#   $ ./parser.py /path/to/captainrc
+#
+# Keep in mind the script does not rely on this file, the code is embedded in the daemon.
+
+import sys, re
+from configparser import ConfigParser
+
+def variable(*fmt):
+    return "{}_{}={}".format(*fmt)
+
+def array(*fmt):
+    return "{}_{}=({})".format(*fmt)
+
+parser = ConfigParser()
+parser.read(sys.argv[1])
+
+for section in parser:
+    for key in parser[section]:
+        # Split on spaces and newlines to determine when to create arrays.
+        current = re.sub('[\n ]', '$', parser[section][key]).split('$')
+        # Replace dashes with underscores for a better user experience.
+        key = key.replace('-', '_')
+        if len(current) == 1:
+            print(variable(section, key, current[0]))
+        else:
+            print(array(section, key, ' '.join(current)))
