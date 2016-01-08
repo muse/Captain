@@ -23,7 +23,7 @@ height = 20
 fonts = "monospace-9"
         "-wuncon-siji-medium-r-normal--10-100-75-75-c-80-iso10646-1"
 dock = "top"
-force = "true"
+force = true
 offset = 0
 
 ; Anything below here is optional.
