@@ -142,6 +142,7 @@ manual() {
         [left]=0
         [top]=0
         [fonts]="monospace-9"
+        [force]=true
         [dock]="top")
     for section in "${!bar[@]}"; do
         if [[ $(eval "echo \${#bar_${section}}") -eq 0 ]]; then
@@ -281,5 +282,6 @@ cat "$process"| format | lemonbar \
     $(echo "-o $bar_offset") \
     $(printf " -f %s" "${bar_fonts[@]}") \
     $(echo "-${bar_dock//[^b]/}") \
-    -g $bar_length\x$bar_height+$bar_left+$bar_top -F "$bar_foreground" -B "$bar_background" -d | handle | sh
+    $([[ $bar_force = true ]] && echo "-d") \
+    -g $bar_length\x$bar_height+$bar_left+$bar_top -F "$bar_foreground" -B "$bar_background" | handle | sh
 wait
