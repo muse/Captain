@@ -238,12 +238,12 @@ manual() {
         if [[ "$(eval "echo \${${name}_reload"})" -eq "-1" ]]; then
             if [[ $(eval "echo \${${name}_manual}") = true ]]; then
                 while read -r output; do
-                    manual "$name" "$file"
+                    manual "$name" "$file" "$output"
                     printf "%s" \
                         "${name}@" \
                         "${content}" \
                         $'\n' > "$process" &
-                done < $(eval "echo \${${name}_reloadcommand"})
+                done < $(eval "echo \${${name}_reloadcommand"}) &
             else
                  while read -r output; do
                     printf "%s" \
@@ -252,12 +252,12 @@ manual() {
                         "$(eval "echo \${line[${name}]"})" \
                         "%{F$(eval "echo \${${name}_foreground}")}" \
                         "%{B$(eval "echo \${${name}_background"})}" \
-                        "$(tr '\n' ' ' < <(bash < "$file"))" \
+                        "$(tr '\n' ' ' < <(bash "$file" "$output"))" \
                         "%{F-}%{B-}" \
                         "$(eval "echo \${area[${name}_s]"})" \
                         "%{-o}%{-uU-}" \
                         $'\n' > "$process" &
-                done < <($(eval "echo \${${name}_reloadcommand"}))
+                done < <($(eval "echo \${${name}_reloadcommand"})) &
             fi
         else
             if [[ $(eval "echo \${${name}_manual}") = true ]]; then

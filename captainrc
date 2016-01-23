@@ -70,6 +70,6 @@ mouse-middle = "notify-send 'Middle click!'"
 mouse-left = "notify-send 'Left click!'"
 mouse-right = "notify-send 'Right click!'"
 reload  = -1
-reloadcommand = xtitle -s
+reloadcommand = "xtitle -s"
 
 # vim:syntax=dosini
