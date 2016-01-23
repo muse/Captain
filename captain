@@ -159,8 +159,8 @@ manual() {
 # manual mode.
 {
     declare -A choices=(
-        [foreground]="#FFFFFFFF"
-        [background]="#FF000000"
+        [foreground]="${bar_foreground}"
+        [background]="${bar_background}"
         [overline]=false
         [manual]=false
         [reload]=5)
