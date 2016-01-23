@@ -125,7 +125,7 @@ manual() {
             handle["$1${area}"]="$(eval "echo \${${name}_${area}}")"
             format=$(sed "s/<@\($area\)@>/$1${area}/g" <<< "$format")
         done
-        content=$(tr '\n' ' ' < <(eval "$format"))
+        content=$(tr '\n' ' ' < <(echo "$output" | eval "$format"))
     } 2>&3
 }
 
@@ -238,12 +238,12 @@ manual() {
         if [[ "$(eval "echo \${${name}_reload"})" -eq "-1" ]]; then
             if [[ $(eval "echo \${${name}_manual}") = true ]]; then
                 while read -r output; do
-                    manual "$name" "$file" "$output"
+                    manual "$name" "$file"
                     printf "%s" \
                         "${name}@" \
                         "${content}" \
                         $'\n' > "$process" &
-                done < $(eval "echo \${${name}_reloadcommand"}) &
+                done < <($(eval "echo \${${name}_reloadcommand"})) &
             else
                  while read -r output; do
                     printf "%s" \

@@ -34,7 +34,8 @@ offset = 0
 
 [window]
 manual = true
-reload = 0.1
+reload = -1
+reloadcommand = "bspc subscribe"
 
 ; You can use dashes, these will be converted to underscores later. This also
 ; means you need to reference to them with underscores in the script.
