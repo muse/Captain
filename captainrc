@@ -34,8 +34,7 @@ offset = 0
 
 [window]
 manual = true
-reload = -1
-reloadcommand = "bspc control --subscribe"
+reload = "bspc control --subscribe"
 
 ; You can use dashes, these will be converted to underscores later. This also
 ; means you need to reference to them with underscores in the script.
@@ -70,7 +69,6 @@ scroll-down = "notify-send 'Scrolled down!'"
 mouse-middle = "notify-send 'Middle click!'"
 mouse-left = "notify-send 'Left click!'"
 mouse-right = "notify-send 'Right click!'"
-reload  = -1
-reloadcommand = "xtitle -s"
+reload = "xtitle -s"
 
 # vim:syntax=dosini
