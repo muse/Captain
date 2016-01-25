@@ -125,7 +125,7 @@ manual() {
             handle["$1${area}"]="$(eval "echo \${${name}_${area}}")"
             format=$(sed "s/<@\($area\)@>/$1${area}/g" <<< "$format")
         done
-        content=$(tr '\n' ' ' < <(eval "$format"))
+        content=$(tr '\n' ' ' < <(echo "$output" | eval "$format"))
     } 2>&3
 }
 
@@ -235,30 +235,56 @@ manual() {
     fi && mkfifo "$process"
     for file in $treasure/*; do
         name=$(basename $file)
-        if [[ $(eval "echo \${${name}_manual}") = true ]]; then
-            while :; do
-                manual "$name" "$file"
-                printf "%s" \
-                    "${name}@" \
-                    "${content}" \
-                    $'\n'
-                sleep $(eval "echo \${${name}_reload"})
-            done > "$process" &
+        if [[ ! -z $(tr -d [:digit:]. <<< $(eval "echo \${${name}_reload"})) ]]; then
+            if [[ $(eval "echo \${${name}_manual}") = true ]]; then
+                while read -r output; do
+                    manual "$name" "$file"
+                    printf "%s" \
+                        "${name}@" \
+                        "${content}" \
+                        $'\n' > "$process" &
+                done < <($(eval "echo \${${name}_reload"})) &
+            else
+                 while read -r output; do
+                    printf "%s" \
+                        "${name}@" \
+                        "$(eval "echo \${area[${name}_p]"})" \
+                        "$(eval "echo \${line[${name}]"})" \
+                        "%{F$(eval "echo \${${name}_foreground}")}" \
+                        "%{B$(eval "echo \${${name}_background"})}" \
+                        "$(tr '\n' ' ' < <(bash "$file" "$output"))" \
+                        "%{F-}%{B-}" \
+                        "$(eval "echo \${area[${name}_s]"})" \
+                        "%{-o}%{-uU-}" \
+                        $'\n' > "$process" &
+                done < <($(eval "echo \${${name}_reload"})) &
+            fi
         else
-            while :; do
-                printf "%s" \
-                    "${name}@" \
-                    "$(eval "echo \${area[${name}_p]"})" \
-                    "$(eval "echo \${line[${name}]"})" \
-                    "%{F$(eval "echo \${${name}_foreground}")}" \
-                    "%{B$(eval "echo \${${name}_background"})}" \
-                    "$(tr '\n' ' ' < <(bash < "$file"))" \
-                    "%{F-}%{B-}" \
-                    "$(eval "echo \${area[${name}_s]"})" \
-                    "%{-o}%{-uU-}" \
-                    $'\n'
-                sleep $(eval "echo \${${name}_reload"})
-            done > "$process" &
+            if [[ $(eval "echo \${${name}_manual}") = true ]]; then
+                while :; do
+                    manual "$name" "$file"
+                    printf "%s" \
+                        "${name}@" \
+                        "${content}" \
+                        $'\n'
+                    sleep $(eval "echo \${${name}_reload"})
+                done > "$process" &
+            else
+                while :; do
+                    printf "%s" \
+                        "${name}@" \
+                        "$(eval "echo \${area[${name}_p]"})" \
+                        "$(eval "echo \${line[${name}]"})" \
+                        "%{F$(eval "echo \${${name}_foreground}")}" \
+                        "%{B$(eval "echo \${${name}_background"})}" \
+                        "$(tr '\n' ' ' < <(bash < "$file"))" \
+                        "%{F-}%{B-}" \
+                        "$(eval "echo \${area[${name}_s]"})" \
+                        "%{-o}%{-uU-}" \
+                        $'\n'
+                    sleep $(eval "echo \${${name}_reload"})
+                done > "$process" &
+            fi
         fi
     done
 } 2>&3
@@ -278,7 +304,7 @@ If you're still confused, remember that the wiki exists: https://github.com/muse
 ===== ===== ===== ===== ===== ====="
 
 # Start captain.
-cat "$process"| format | lemonbar \
+cat "$process" | format | lemonbar \
     $(echo "-o $bar_offset") \
     $(printf " -f %s" "${bar_fonts[@]}") \
     $(echo "-${bar_dock//[^b]/}") \
