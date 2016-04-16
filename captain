@@ -30,17 +30,20 @@ set -e
 # This would cause problems when the script is not ran from the captain directory.
 cd $(dirname $0)
 
+# XDG Compliance
+captaindir=${XDG_CONFIG_HOME:-~/.config}/captain
+
 # Create the log file, and bind it to a file descriptor.
-if [[ ! -d ~/.config/captain ]]; then
-    mkdir -p ~/.config/captain
-fi && exec 3<> ~/.config/captain/captain.log
+if [[ ! -d "$captaindir" ]]; then
+    mkdir -p "$captaindir"
+fi && exec 3<> "$captaindir/captain.log"
 
 # Create the scripts directory.
-if [[ ! -d ~.config/captain/captain.d ]]; then
-    mkdir -p ~/.config/captain/captain.d
-fi && treasure=~/.config/captain/captain.d
+if [[ ! -d "$captaindir/captain.d" ]]; then
+    mkdir -p "$captaindir/captain.d"
+fi && treasure="$captaindir/captain.d"
 
-manuscript=~/.config/captain/captainrc
+manuscript="$captaindir/captainrc"
 
 # The only bit of python in the code, we parse .dosini file with it.
 source <(python3 -c "
