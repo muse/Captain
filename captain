@@ -34,14 +34,10 @@ cd $(dirname $0)
 captaindir=${XDG_CONFIG_HOME:-~/.config}/captain
 
 # Create the log file, and bind it to a file descriptor.
-if [[ ! -d "$captaindir" ]]; then
-    mkdir -p "$captaindir"
-fi && exec 3<> "$captaindir/captain.log"
+exec 3<> "$captaindir/captain.log"
 
-# Create the scripts directory.
-if [[ ! -d "$captaindir/captain.d" ]]; then
-    mkdir -p "$captaindir/captain.d"
-fi && treasure="$captaindir/captain.d"
+# Assign the scripts directory.
+treasure="$captaindir/captain.d"
 
 manuscript="$captaindir/captainrc"
 
@@ -169,9 +165,9 @@ manual() {
         [reload]=5)
     for file in $treasure/*; do
         name=$(basename $file)
-        if [[ $(eval "echo \${${name}_manual") = true ]]; then
+        if [[ $(eval "echo \${${name}_manual}") = true ]]; then
             echo "Manual mode has been enabled for ${name}."
-            if [[ $(eval "echo \${#${name}_reload") -eq 0 ]]; then
+            if [[ $(eval "echo \${#${name}_reload}") -eq 0 ]]; then
                 echo "No value for '${name}-$section' -> using ${choices[${section}]}"
                 eval "${name}_reload=${choices[reload]}"
             fi
