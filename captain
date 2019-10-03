@@ -303,7 +303,7 @@ If you're still confused, remember that the wiki exists: https://github.com/muse
 ===== ===== ===== ===== ===== ====="
 
 # Start captain.
-cat "$process" | format | lemonbar \
+cat "$process" | format | lemonbar -a 20 \
     $(echo "-o $bar_offset") \
     $(printf " -f %s" "${bar_fonts[@]}") \
     $(echo "-${bar_dock//[^b]/}") \

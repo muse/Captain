@@ -1,0 +1,13 @@
+ActiveWorkspace(){
+    echo -n -e $(i3-msg -t get_workspaces | jq -r '.[] | select(.focused==true).name')
+}
+
+InactiveWorkspace(){
+    echostr=""
+    for lworkspace in $(i3-msg -t get_workspaces | jq -r '.[] | select(.focused==false).name'); do 
+    echostr="${echostr}${lworkspace} "
+    done
+    echo -e -n "$echostr"
+}
+
+echo -e -n "$(ActiveWorkspace) | $(InactiveWorkspace)"
