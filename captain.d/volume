@@ -1,8 +1,16 @@
 #!/usr/bin/env bash
 # Dependencies: amixer, siji
 
-volume=$(amixer sget Master | sed -n "0,/.*\[\([0-9]\+\)%\].*/s//\1/p")
-state=$(amixer sget Master | grep -Eoe '\[(on|off)\]')
+# gets the master mixer
+# sometimes the card which contains the mixer may not come first so you have to iterate
+mixer=""
+card_no=0
+while [[ $mixer == "" ]]; do
+	mixer=$(amixer -c ${count} sget Master)
+	volume=$( echo $mixer | sed -n "0,/.*\[\([0-9]\+\)%\].*/s//\1/p")
+	state=$( echo $mixer | grep -Eoe '\[(on|off)\]')
+	((card_no++))
+done
 
 if   [[ $volume -eq 0 || $state == '[off]' ]]; then
     token=''
